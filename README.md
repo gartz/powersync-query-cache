@@ -8,13 +8,8 @@ A persistent two-layer (memory → IndexedDB) cache of watched query results. Sc
 npm add powersync-query-cache
 ```
 
-For web applications with IndexedDB support, also install the browser storage adapter:
-
-```bash
-npm add powersync-query-cache
-```
-
-The package ships both the plugin and the storage adapter in a single npm dependency.
+The package ships both the plugin and the browser (IndexedDB) storage adapter, the
+latter under the `powersync-query-cache/idb` entry point.
 
 ## Quick start
 
@@ -64,18 +59,26 @@ db.query({
 });
 ```
 
-The same options apply to `watch()` and `differentialWatch()`:
+The same options apply to `watch()` and `differentialWatch()`, and to a later
+`updateSettings()` on an existing watched query. Note that `updateSettings` takes a
+`WatchCompatibleQuery`, not a raw `{ sql, parameters }` object:
 
 ```ts
 watched.updateSettings({
-  query: { sql, parameters },
+  query: {
+    compile: () => ({ sql: 'SELECT * FROM todos WHERE done = ?', parameters: [0] }),
+    execute: ({ sql, parameters }) => db.getAll(sql, parameters)
+  },
   extensions: { cache: false }
 });
 ```
 
+Extensions declared on a `db.query({ ... })` definition stay in force across
+`updateSettings()` calls; per-call `extensions` override them key by key.
+
 ## Encryption
 
-When the database is opened with an `encryptionKey`, cached payloads are encrypted with AES-GCM using a key derived from it via HKDF-SHA256. 
+When the database is opened with an `encryptionKey`, cached payloads are encrypted with AES-GCM using a key derived from it via HKDF-SHA256.
 
 Pass the encryption key **in the plugin options**:
 
@@ -101,7 +104,14 @@ new QueryCachePlugin({
 })
 ```
 
-Key rotation is automatic: when the encryption key or plugin version changes, old cached entries are pruned on the next `pruneForeign()` call.
+Key rotation is automatic: when the encryption key or plugin version changes, the
+identity bucket changes with it, so old entries no longer match any query and are
+pruned the next time the plugin opens.
+
+The namespace also embeds a fingerprint of the encryption key, derived with HKDF-SHA256
+under a fixed salt. The key itself is never written anywhere. HKDF does not stretch,
+though — if your key comes from a user passphrase, use `encryption.getKey` above so the
+passphrase is not recoverable from the stored namespace by dictionary search.
 
 ## Provenance and cache age
 
@@ -144,7 +154,9 @@ Cached entries are bound to:
 
 They are:
 - **Cleared** by `disconnectAndClear()` — logs out, switches users, etc.
-- **Pruned** when any of the identity inputs change — schema upgrade, key rotation, etc.
+- **Pruned** at startup when any of the identity inputs change — schema upgrade, key
+  rotation, cache-version bump. The bucket is computed once when the database opens, so
+  a schema change mid-session takes effect on the next start.
 - **Evicted** least-recently-used once any layer's byte budget is exceeded, regardless of TTL.
 - **Dropped** once past their TTL.
 
@@ -160,6 +172,27 @@ The memory layer is per–database instance and never encrypted. The persistent 
 
 - **Not cached:** The legacy `db.watch(sql, parameters)` API (its result shape cannot be serialized) and `runQueryOnce()` one-shot queries.
 - **Encryption:** The SDK does not expose its database encryption key to plugins. If you need the cache encrypted with the same key, pass it separately to the plugin.
+
+## Development
+
+The `@powersync/*` entries under `devDependencies` are `file:` paths into a **local
+checkout** of the PowerSync SDK, not published packages — the watched-query plugin API
+this package is built on has not shipped upstream yet (see **Requirements** above).
+Check out the fork's `persistent-query-cache` branch, build it with
+`pnpm build:packages`, and make the `file:` paths point at it before `npm install`.
+
+The browser test suite has to allow-list that checkout for Vite. It defaults to
+`/powersync-js`; set `POWERSYNC_SDK_PATH` if yours lives elsewhere:
+
+```bash
+POWERSYNC_SDK_PATH=~/src/powersync-js npm run test:browser
+```
+
+```bash
+npm run build        # tsc -b
+npm run test:node    # unit tests, no browser
+npm run test:browser # IndexedDB + end-to-end tests under Playwright
+```
 
 ## TypeScript
 
