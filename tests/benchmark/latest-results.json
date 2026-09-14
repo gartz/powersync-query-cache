@@ -1,37 +1,45 @@
 {
-  "generatedAt": "2026-09-14T07:08:40.514Z",
+  "generatedAt": "2026-09-14T17:26:41.991Z",
   "results": [
     {
       "sizeMb": 10,
       "actualBytes": 11431936,
       "rows": 8000,
-      "liveNoCacheMs": 1880.659999847412,
-      "cachePaintMs": 107.0250015258789,
-      "liveWithCacheMs": 1860.6199989318848
+      "liveNoCacheMs": 1260.6549987792969,
+      "cachePaintMs": 84.20499992370605,
+      "liveWithCacheMs": 1408.4449996948242,
+      "navNoCacheMs": 68.06000137329102,
+      "navCacheMs": 0.1700000762939453
     },
     {
       "sizeMb": 50,
-      "actualBytes": 53989376,
+      "actualBytes": 54005760,
       "rows": 38000,
-      "liveNoCacheMs": 6600.204999923706,
-      "cachePaintMs": 88.56000137329102,
-      "liveWithCacheMs": 7285.470001220703
+      "liveNoCacheMs": 6649.809999465942,
+      "cachePaintMs": 86.42000007629395,
+      "liveWithCacheMs": 6526.824998855591,
+      "navNoCacheMs": 5939.579999923706,
+      "navCacheMs": 0.35000038146972656
     },
     {
       "sizeMb": 100,
-      "actualBytes": 105095168,
+      "actualBytes": 105140224,
       "rows": 74000,
-      "liveNoCacheMs": 11952.069999694824,
-      "cachePaintMs": 107.77499961853027,
-      "liveWithCacheMs": 11125.640001296997
+      "liveNoCacheMs": 13020.099998474121,
+      "cachePaintMs": 68.42499923706055,
+      "liveWithCacheMs": 12768.625,
+      "navNoCacheMs": 12410.659999847412,
+      "navCacheMs": 0.4400005340576172
     },
     {
       "sizeMb": 200,
-      "actualBytes": 210010112,
+      "actualBytes": 210141184,
       "rows": 148000,
-      "liveNoCacheMs": 20605.684999465942,
-      "cachePaintMs": 62.89999961853027,
-      "liveWithCacheMs": 22387.159999847412
+      "liveNoCacheMs": 22739.079999923706,
+      "cachePaintMs": 65.76499938964844,
+      "liveWithCacheMs": 23948.42499923706,
+      "navNoCacheMs": 25471.490001678467,
+      "navCacheMs": 0.12999916076660156
     }
   ]
 }

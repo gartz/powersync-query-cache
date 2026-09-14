@@ -164,36 +164,57 @@ The memory layer is per–database instance and never encrypted. The persistent 
 
 ## Performance
 
-The whole point of the cache is time-to-first-render on a cold boot: a fresh page load
-has to open the SQLite database (backed by IndexedDB in the browser), initialize the
-PowerSync session, and run the first query before anything can render — and that cost
-grows with database size. The cached paint only has to read one small IndexedDB entry,
-so it stays flat no matter how large the database gets.
+The whole point of the cache is time-to-first-render. Two moments matter:
+
+- **Cold boot** (page load, refresh): a fresh page has to open the SQLite database
+  (backed by IndexedDB in the browser), initialize the PowerSync session, and run the
+  first query before anything can render — and that cost grows with database size. The
+  cached paint reads one small IndexedDB entry instead, so it stays flat.
+- **In-session navigation** (back/forward, route changes): the database is already
+  open, but re-mounting a watched query still re-runs the live query. The memory layer
+  seeds the re-mounted query's *constructed* state synchronously — the first render
+  already has the rows, with no async gap at all.
 
 Measured with the bundled benchmark (`npm run bench:browser`, headless Chromium,
-median of 3 cold boots per mode; a dashboard-shaped watched query — `ORDER BY` over a
+median of 3 runs per mode; a dashboard-shaped watched query — `ORDER BY` over a
 non-indexed column with `LIMIT 50` — against ~1 KB rows):
 
-| Database size | First rows without cache | First rows with cache | Speedup |
+**Cold boot — time to first rows:**
+
+| Database size | Without cache | With cache | Speedup |
 | --- | --- | --- | --- |
-| 10 MB (8k rows) | 1,881 ms | 107 ms | ~18× |
-| 50 MB (38k rows) | 6,600 ms | 89 ms | ~75× |
-| 100 MB (74k rows) | 11,952 ms | 108 ms | ~111× |
-| 200 MB (148k rows) | 20,606 ms | 63 ms | ~328× |
+| 10 MB (8k rows) | 1,261 ms | 84 ms | ~15× |
+| 50 MB (38k rows) | 6,650 ms | 86 ms | ~77× |
+| 100 MB (74k rows) | 13,020 ms | 68 ms | ~190× |
+| 200 MB (148k rows) | 22,739 ms | 66 ms | ~346× |
 
-Two things to read out of the table:
+**In-session navigation (query re-mounted, database already open) — time to first rows:**
 
-- **Without the cache, first render scales with database size** — roughly 100 ms per MB
-  in this setup, because the first query pays for opening and reading the database.
-- **With the cache, first paint is constant** (~60–110 ms here) regardless of size: it
-  never touches SQLite. The live result still arrives on its usual schedule and swaps
-  in (`source` flips from `'cache'` to `'live'`), so at 200 MB the user sees data ~20
-  seconds sooner.
+| Database size | Without cache | With cache (memory layer) |
+| --- | --- | --- |
+| 10 MB | 68 ms | 0.17 ms |
+| 50 MB | 5,940 ms | 0.35 ms |
+| 100 MB | 12,411 ms | 0.44 ms |
+| 200 MB | 25,471 ms | 0.13 ms |
+
+Three things to read out of the tables:
+
+- **Without the cache, first render scales with database size** — on cold boot AND on
+  every navigation whose query has to scan (the 10 MB nav row is small only because
+  that table still fits the warm page cache; past it, re-mounting costs as much as
+  booting).
+- **The cold-boot cached paint is constant** (~65–90 ms here) regardless of size: it
+  never touches SQLite.
+- **The navigation cached paint is synchronous** — sub-millisecond and flat, because
+  the memory layer fills the watched query's initial state before the first render.
+  Pressing back/forward repaints the previous screen instantly; the live result still
+  arrives and swaps in (`source` flips `'cache'` → `'live'`).
 
 Numbers were taken inside the test runner, where a "cold boot" is a fresh
 `PowerSyncDatabase` instance re-reading pages from IndexedDB (wa-sqlite's page cache is
-per-connection). Absolute times will differ per machine, browser, and query — re-run
-`npm run bench:browser` to measure your own; results land in
+per-connection), and a "navigation" is tearing down and re-creating the watched query
+on the open instance. Absolute times will differ per machine, browser, and query —
+re-run `npm run bench:browser` to measure your own; results land in
 `tests/benchmark/latest-results.json`.
 
 ## Requirements

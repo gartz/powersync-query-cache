@@ -50,6 +50,8 @@ interface SizeResult {
   liveNoCacheMs: number;
   cachePaintMs: number;
   liveWithCacheMs: number;
+  navNoCacheMs: number;
+  navCacheMs: number;
 }
 
 const results: SizeResult[] = [];
@@ -120,6 +122,56 @@ async function measureBoot(withCache: boolean): Promise<BootTimings> {
   return timings;
 }
 
+/**
+ * In-session navigation: the database instance stays open (the page was not reloaded);
+ * the watched query is torn down and re-created, as a router does on back/forward.
+ * With the cache, the memory layer seeds the CONSTRUCTED state synchronously, so the
+ * time to first rows is just the watch() call itself. Without it, the live query
+ * re-runs from scratch. Warm-up watch first in both modes so SQLite's per-connection
+ * page cache is equally warm — the difference measured is the render path, not disk.
+ */
+async function measureNav(withCache: boolean): Promise<number> {
+  const { db } = openDatabase(withCache);
+
+  const warm = db.query<{ id: string }>({ sql: BENCH_QUERY }).watch();
+  await new Promise<void>((resolve) => {
+    const check = (state: { source: string; data: unknown[] }) => {
+      if (state.source === 'live' && state.data?.length) resolve();
+    };
+    check(warm.state as any);
+    warm.registerListener({ onStateChange: check as any });
+  });
+  await warm.close();
+
+  const times: number[] = [];
+  for (let i = 0; i < ITERATIONS; i++) {
+    const t0 = performance.now();
+    const watched = db.query<{ id: string }>({ sql: BENCH_QUERY }).watch();
+    if (withCache) {
+      // The memory layer must have painted synchronously, in the constructed state —
+      // anything async here would be the IDB or live path, not the nav path.
+      expect(watched.state.source).toBe('cache');
+      expect(watched.state.data.length).toBeGreaterThan(0);
+      times.push(performance.now() - t0);
+    } else {
+      await new Promise<void>((resolve) => {
+        const check = (state: { data: unknown[] }) => {
+          if (state.data?.length) {
+            times.push(performance.now() - t0);
+            resolve();
+          }
+        };
+        check(watched.state as any);
+        watched.registerListener({ onStateChange: check as any });
+      });
+    }
+    await watched.close();
+  }
+
+  await db.close();
+  return median(times);
+}
+
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)];
@@ -159,6 +211,9 @@ describe('cold boot benchmark', () => {
           withCache.push(await measureBoot(true));
         }
 
+        const navNoCacheMs = await measureNav(false);
+        const navCacheMs = await measureNav(true);
+
         const cachePaints = withCache.map((t) => t.tCache);
         expect(cachePaints.every((t): t is number => typeof t === 'number')).toBe(true);
 
@@ -168,7 +223,9 @@ describe('cold boot benchmark', () => {
           rows,
           liveNoCacheMs: median(noCache.map((t) => t.tLive)),
           cachePaintMs: median(cachePaints as number[]),
-          liveWithCacheMs: median(withCache.map((t) => t.tLive))
+          liveWithCacheMs: median(withCache.map((t) => t.tLive)),
+          navNoCacheMs,
+          navCacheMs
         };
         results.push(result);
         console.log(`BENCH_RESULT ${JSON.stringify(result)}`);
@@ -176,7 +233,8 @@ describe('cold boot benchmark', () => {
           `BENCH ${sizeMb}MB (actual ${(actualBytes / 1024 / 1024).toFixed(1)}MB, ${rows} rows): ` +
             `no-cache first rows ${result.liveNoCacheMs.toFixed(0)}ms | ` +
             `cache paint ${result.cachePaintMs.toFixed(0)}ms | ` +
-            `live swap (cached boot) ${result.liveWithCacheMs.toFixed(0)}ms`
+            `live swap (cached boot) ${result.liveWithCacheMs.toFixed(0)}ms | ` +
+            `nav no-cache ${result.navNoCacheMs.toFixed(0)}ms | nav cache ${result.navCacheMs.toFixed(2)}ms`
         );
     });
   }
@@ -184,11 +242,10 @@ describe('cold boot benchmark', () => {
   it('prints the summary table', async () => {
     const lines = [
       'BENCH_SUMMARY',
-      '| DB size | First rows without cache | First rows with cache | Speedup |',
-      '| --- | --- | --- | --- |',
+      '| DB size | Cold boot no cache | Cold boot cached | Nav no cache | Nav cached |',
+      '| --- | --- | --- | --- | --- |',
       ...results.map((r) => {
-        const speedup = r.liveNoCacheMs / r.cachePaintMs;
-        return `| ${r.sizeMb}MB | ${r.liveNoCacheMs.toFixed(0)}ms | ${r.cachePaintMs.toFixed(0)}ms | ${speedup.toFixed(1)}x |`;
+        return `| ${r.sizeMb}MB | ${r.liveNoCacheMs.toFixed(0)}ms | ${r.cachePaintMs.toFixed(0)}ms | ${r.navNoCacheMs.toFixed(0)}ms | ${r.navCacheMs.toFixed(2)}ms |`;
       })
     ];
     console.log(lines.join('\n'));
