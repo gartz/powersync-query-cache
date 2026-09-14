@@ -105,25 +105,24 @@ Key rotation is automatic: when the encryption key or plugin version changes, ol
 
 ## Provenance and cache age
 
-`WatchedQueryState` carries two fields reporting the result's origin:
+`WatchedQueryState.source` reports where the data came from:
 
-- `source: 'placeholder' | 'cache' | 'live'` — where the data came from.
-- `cachedAt: Date | null` — when the cached result was written, or `null` if not from cache.
+- `'placeholder'` — the configured placeholder, no query has resolved yet
+- `'cache'` — a previously persisted result, painted before the live query resolved
+- `'live'` — the current result of the query against the local database
 
-```ts
-if (watched.state.source === 'cache') {
-  const ageMs = Date.now() - watched.state.cachedAt!.getTime();
-  console.log(`Painted from cache, ${ageMs}ms old`);
-}
-```
-
-For React, the cache metadata is available via:
+When `source` is `'cache'`, the cache metadata is available via `getCacheMeta()`:
 
 ```ts
 import { getCacheMeta } from 'powersync-query-cache';
 
-const meta = getCacheMeta(queryState);
-console.log(meta?.cachedAt, meta?.ttlMs);
+if (watched.state.source === 'cache') {
+  const meta = getCacheMeta(watched.state);
+  if (meta) {
+    const ageMs = Date.now() - meta.cachedAt.getTime();
+    console.log(`Painted from cache, ${ageMs}ms old`);
+  }
+}
 ```
 
 ## Defaults
