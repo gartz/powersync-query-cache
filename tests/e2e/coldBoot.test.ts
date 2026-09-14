@@ -30,6 +30,30 @@ function openDatabase(dbFilename: string, cacheDatabaseName: string) {
   return db;
 }
 
+/**
+ * Captures the full `state.source` history of a watched query via its listener, rather
+ * than polling a point-in-time snapshot. The cache-seeded state can be transient (the
+ * plugin's IndexedDB hydrate and the live SQLite query both start racing the instant the
+ * database reports ready), so a poll-based assertion can miss it entirely even when it
+ * genuinely occurred — and, symmetrically, can never prove a state did NOT occur. A
+ * listener sees every transition, so it can assert both presence/ordering and absence.
+ *
+ * `onStateChange` only fires on updates, so the state as constructed (synchronous, before
+ * any listener could be registered) is captured up front and seeded into the history.
+ */
+function trackSourceHistory(query: { state: { source: string }; registerListener: (l: any) => () => void }) {
+  const history: string[] = [query.state.source];
+  const dispose = query.registerListener({
+    onStateChange: (state: { source: string }) => {
+      const last = history[history.length - 1];
+      if (state.source !== last) {
+        history.push(state.source);
+      }
+    }
+  });
+  return { history, dispose };
+}
+
 describe('query cache', () => {
   it('paints the previous result on a fresh database instance', async () => {
     const dbFilename = `cache-${crypto.randomUUID()}.db`;
@@ -48,18 +72,13 @@ describe('query cache', () => {
     // live query resolves came from IndexedDB.
     const second = openDatabase(dbFilename, cacheDatabaseName);
     const reopened = second.query<{ make: string }>({ sql: 'SELECT make FROM assets' }).watch();
-
-    // The cache-seeded state is transient: the plugin's IndexedDB hydrate and the live
-    // SQLite query both start racing the instant the database reports ready, so the
-    // window where state.source === 'cache' is typically single-digit milliseconds
-    // before 'live' supersedes it. vi.waitFor's default 50ms poll interval is coarser
-    // than that window, so poll finely here to reliably observe the transient state
-    // rather than skip straight from 'placeholder' to 'live' between polls.
-    await vi.waitFor(() => expect(reopened.state.source).toBe('cache'), { timeout: 5000, interval: 2 });
-    expect(reopened.state.data).toEqual([{ make: 'cached-make' }]);
-    expect(reopened.state.isLoading).toBe(false);
+    const { history, dispose } = trackSourceHistory(reopened);
 
     await vi.waitFor(() => expect(reopened.state.source).toBe('live'), { timeout: 5000 });
+    dispose();
+
+    expect(history).toContain('cache');
+    expect(history.indexOf('cache')).toBeLessThan(history.indexOf('live'));
     expect(reopened.state.data).toEqual([{ make: 'cached-make' }]);
     await reopened.close();
   });
@@ -81,9 +100,13 @@ describe('query cache', () => {
 
     const second = openDatabase(dbFilename, cacheDatabaseName);
     const reopened = second.query<{ make: string }>({ sql: 'SELECT make FROM assets' }).watch();
+    const { history, dispose } = trackSourceHistory(reopened);
 
     // Nothing may paint from cache; the only data that can arrive is the (now empty) live result.
     await vi.waitFor(() => expect(reopened.state.source).toBe('live'), { timeout: 5000 });
+    dispose();
+
+    expect(history).not.toContain('cache');
     expect(reopened.state.data).toEqual([]);
     await reopened.close();
   });
