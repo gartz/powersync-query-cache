@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "DOM"],
+    "declaration": true,
+    "sourceMap": true,
+    "strict": true,
+    "outDir": "lib",
+    "rootDir": "src",
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}
