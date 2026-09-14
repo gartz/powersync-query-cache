@@ -24,12 +24,15 @@ export interface QueryCacheMeta {
  */
 export interface QueryCacheEntry extends QueryCacheMeta {
   /**
-   * The query signature (`sql` + serialized parameters) this entry was written for.
-   * A read must compare it against the requesting query and discard the entry on a
-   * mismatch, so a key-hash collision can never serve one query another's rows.
+   * The encoded entry; ciphertext when encryption is active.
+   *
+   * Carries the query signature it was written for alongside the rows, so a read can
+   * discard an entry whose signature does not match the requesting query and a
+   * key-hash collision can never serve one query another's rows. The signature is
+   * sealed with the rows rather than stored beside them: on disk it is raw SQL and
+   * raw parameter values, and the persisted key is hashed precisely so that neither
+   * is readable there.
    */
-  signature: string;
-  /** Encoded rows; ciphertext when encryption is active. */
   payload: Uint8Array;
   /** AES-GCM initialisation vector. Present only when the payload is encrypted. */
   iv?: Uint8Array;

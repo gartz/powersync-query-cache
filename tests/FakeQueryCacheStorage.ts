@@ -25,6 +25,8 @@ export class FakeQueryCacheStorage implements QueryCacheStorage {
   failEverything = false;
   /** Set to make open() hang, simulating a blocked IndexedDB upgrade. */
   hangOnOpen = false;
+  /** Set to hold clear() open until the promise resolves, simulating a slow wipe. */
+  blockClear?: Promise<void>;
 
   private invalidateHandlers = new Set<(event: QueryCacheInvalidation) => void>();
 
@@ -80,6 +82,9 @@ export class FakeQueryCacheStorage implements QueryCacheStorage {
 
   async clear(): Promise<void> {
     this.assertHealthy();
+    if (this.blockClear) {
+      await this.blockClear;
+    }
     this.clearCalls++;
     this.entries.clear();
   }

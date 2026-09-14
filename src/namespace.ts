@@ -26,5 +26,15 @@ export async function computeCacheNamespace(inputs: CacheNamespaceInputs): Promi
     ? await fingerprintKey(inputs.subtle, inputs.encryptionKey)
     : '-';
 
-  return [inputs.databaseName, schemaHash, keyFingerprint, inputs.version].join('|');
+  return joinIdentity([inputs.databaseName, schemaHash, keyFingerprint, inputs.version]);
+}
+
+/**
+ * Length-prefixed join. A plain `join('|')` is ambiguous the moment a component can
+ * contain the separator — a database named `a|b` with version `c` and one named `a`
+ * with version `b|c` would produce byte-identical namespaces and share cached rows.
+ * Prefixing each component with its length removes the ambiguity without hashing.
+ */
+function joinIdentity(components: string[]): string {
+  return components.map((component) => `${component.length}:${component}`).join('|');
 }

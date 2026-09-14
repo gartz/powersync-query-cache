@@ -11,9 +11,9 @@ export interface IndexedDbQueryCacheStorageOptions {
 
 interface PayloadRecord {
   key: string;
+  /** The sealed envelope. Carries the query signature with the rows; see QueryCacheEntry. */
   payload: Uint8Array;
   iv?: Uint8Array;
-  signature: string;
 }
 
 const DEFAULT_NAME = 'powersync-query-cache';
@@ -43,8 +43,17 @@ export class IndexedDbQueryCacheStorage implements QueryCacheStorage {
   async read(key: string): Promise<QueryCacheEntry | undefined> {
     const db = this.require();
     const tx = db.transaction([META_STORE, PAYLOAD_STORE], 'readonly');
-    const meta = await requestToPromise<QueryCacheMeta | undefined>(tx.objectStore(META_STORE).get(key));
-    const payload = await requestToPromise<PayloadRecord | undefined>(tx.objectStore(PAYLOAD_STORE).get(key));
+    // Both requests are issued synchronously, before anything is awaited. Awaiting the
+    // first and only then issuing the second risks the transaction having auto-committed
+    // in between (TransactionInactiveError), since a transaction stays alive only while
+    // it has outstanding requests.
+    const metaRequest = tx.objectStore(META_STORE).get(key);
+    const payloadRequest = tx.objectStore(PAYLOAD_STORE).get(key);
+
+    const [meta, payload] = await Promise.all([
+      requestToPromise<QueryCacheMeta | undefined>(metaRequest),
+      requestToPromise<PayloadRecord | undefined>(payloadRequest)
+    ]);
 
     if (!meta || !payload) {
       return undefined;
@@ -52,7 +61,6 @@ export class IndexedDbQueryCacheStorage implements QueryCacheStorage {
 
     return {
       ...meta,
-      signature: payload.signature,
       payload: payload.payload,
       iv: payload.iv
     };
@@ -72,7 +80,6 @@ export class IndexedDbQueryCacheStorage implements QueryCacheStorage {
 
     tx.objectStore(PAYLOAD_STORE).put({
       key: entry.key,
-      signature: entry.signature,
       payload: entry.payload,
       iv: entry.iv
     } satisfies PayloadRecord);

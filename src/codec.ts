@@ -1,7 +1,7 @@
 import { toHex } from './keys.js';
 
 /**
- * Encodes query results to bytes.
+ * Encodes a persisted cache entry's plaintext to bytes.
  *
  * The same codec runs whether or not the payload is encrypted, so a cached result
  * round-trips identically in both modes. Structured clone is deliberately not used:
@@ -78,10 +78,25 @@ function reviver(_key: string, value: unknown): unknown {
   }
 }
 
-export function encodeRows(rows: readonly unknown[]): Uint8Array {
-  let json: string;
+/**
+ * The plaintext of one persisted entry: the rows, together with the query signature
+ * they were written for.
+ *
+ * The signature lives INSIDE this envelope on purpose. Stored beside the payload it
+ * would put the raw SQL and every parameter value on disk in cleartext, next to the
+ * ciphertext they describe — which is precisely what hashing the persisted key exists
+ * to prevent. Sealed in here, the collision check costs one decrypt that a read
+ * performs anyway.
+ */
+export interface QueryCacheEnvelope {
+  signature: string;
+  rows: unknown[];
+}
+
+export function encodeEnvelope(signature: string, rows: readonly unknown[]): Uint8Array {
+  let json: string | undefined;
   try {
-    json = JSON.stringify(rows, replacer);
+    json = JSON.stringify({ signature, rows }, replacer);
   } catch (error) {
     throw new QueryCacheEncodeError(error);
   }
@@ -91,8 +106,16 @@ export function encodeRows(rows: readonly unknown[]): Uint8Array {
   return new TextEncoder().encode(json);
 }
 
-export function decodeRows(bytes: Uint8Array): unknown[] {
+/**
+ * @returns the envelope, or undefined when the bytes are not one — a record written by
+ * an older format, or anything else that does not decode to the expected shape. The
+ * caller treats that exactly like a signature mismatch: delete the entry and miss.
+ */
+export function decodeEnvelope(bytes: Uint8Array): QueryCacheEnvelope | undefined {
   const json = new TextDecoder().decode(bytes);
-  const parsed = JSON.parse(json, reviver);
-  return Array.isArray(parsed) ? parsed : [];
+  const parsed = JSON.parse(json, reviver) as Partial<QueryCacheEnvelope> | null;
+  if (!parsed || typeof parsed !== 'object' || typeof parsed.signature !== 'string' || !Array.isArray(parsed.rows)) {
+    return undefined;
+  }
+  return { signature: parsed.signature, rows: parsed.rows };
 }

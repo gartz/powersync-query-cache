@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { decodeRows, encodeRows, QueryCacheEncodeError } from '../src/codec.js';
+import { decodeEnvelope, encodeEnvelope, QueryCacheEncodeError } from '../src/codec.js';
 
-const roundTrip = (rows: unknown[]) => decodeRows(encodeRows(rows));
+const SIGNATURE = 'SELECT * FROM items\0[]';
+const roundTrip = (rows: unknown[]) => decodeEnvelope(encodeEnvelope(SIGNATURE, rows))!.rows;
 
 describe('codec', () => {
   it('round-trips SQLite primitives', () => {
@@ -46,9 +47,27 @@ describe('codec', () => {
   });
 
   it('throws QueryCacheEncodeError for values it cannot represent', () => {
-    expect(() => encodeRows([{ fn: () => 1 }])).toThrow(QueryCacheEncodeError);
+    expect(() => encodeEnvelope(SIGNATURE, [{ fn: () => 1 }])).toThrow(QueryCacheEncodeError);
     const circular: any = {};
     circular.self = circular;
-    expect(() => encodeRows([circular])).toThrow(QueryCacheEncodeError);
+    expect(() => encodeEnvelope(SIGNATURE, [circular])).toThrow(QueryCacheEncodeError);
+  });
+
+  it('carries the query signature inside the encoded bytes', () => {
+    const decoded = decodeEnvelope(encodeEnvelope(SIGNATURE, [{ id: 1 }]));
+    expect(decoded?.signature).toBe(SIGNATURE);
+    expect(decoded?.rows).toEqual([{ id: 1 }]);
+  });
+
+  it('rejects bytes that are not an envelope', () => {
+    // A record written by an older format: a bare rows array.
+    expect(decodeEnvelope(new TextEncoder().encode('[{"id":1}]'))).toBeUndefined();
+    expect(decodeEnvelope(new TextEncoder().encode('{"signature":"s"}'))).toBeUndefined();
+    expect(decodeEnvelope(new TextEncoder().encode('null'))).toBeUndefined();
+  });
+
+  it('does not mistake row data shaped like the envelope', () => {
+    const rows = [{ signature: 'not the real one', rows: ['decoy'] }];
+    expect(roundTrip(rows)).toEqual(rows);
   });
 });

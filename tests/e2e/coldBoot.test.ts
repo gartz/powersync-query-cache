@@ -130,9 +130,16 @@ describe('query cache', () => {
     const reopened = second
       .query<{ make: string }>({ sql: 'SELECT make FROM assets', extensions: { cache: false } })
       .watch();
+    // A point-in-time check can only ever see the state it happens to land on; a cache
+    // paint here would be transient and could be overwritten by the live result before
+    // the poll fires. The history sees every transition, so it can prove absence.
+    const { history, dispose } = trackSourceHistory(reopened);
 
     await vi.waitFor(() => expect(reopened.state.source).toBe('live'), { timeout: 5000 });
-    expect(reopened.state.source).not.toBe('cache');
+    dispose();
+
+    expect(history).not.toContain('cache');
+    expect(reopened.state.data).toEqual([{ make: 'not-cached' }]);
     await reopened.close();
   });
 });

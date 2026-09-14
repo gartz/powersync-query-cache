@@ -96,17 +96,22 @@ export class QueryCachePlugin implements WatchedQueryPlugin {
       },
       onResult: (rows, info) => {
         if (info.dataIsArray) {
-          manager.record(signature, rows as unknown[], {
-            hasSynced: info.hasSynced,
-            ttlMs: resolved.ttlMs
-          });
+          // The TTL is a read-side decision (peek/hydrate compare against it), so the
+          // write does not carry one.
+          manager.record(signature, rows as unknown[], { hasSynced: info.hasSynced });
         }
       }
     };
   }
 
-  /** Test-only: drains pending persists. */
-  flushForTests(): Promise<void> {
+  /**
+   * Drains pending cache writes and resolves once they have reached storage.
+   *
+   * Writes are debounced, so without this a page that is about to go away (or a test
+   * about to assert on storage) can lose the last emission. The plugin also flushes on
+   * the platform's own triggers and on database close.
+   */
+  flush(): Promise<void> {
     return this.manager?.flush() ?? Promise.resolve();
   }
 }

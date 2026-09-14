@@ -14,7 +14,6 @@ function entry(overrides?: Partial<QueryCacheEntry>): QueryCacheEntry {
   return {
     key: 'key-1',
     namespace: 'ns',
-    signature: 'SELECT 1\0[]',
     updatedAt: 1000,
     lastUsedAt: 1000,
     bytes: 12,
@@ -36,8 +35,10 @@ describe('IndexedDbQueryCacheStorage', () => {
     await storage.write(entry());
 
     const read = await storage.read('key-1');
-    expect(read?.signature).toBe('SELECT 1\0[]');
+    expect(read?.namespace).toBe('ns');
     expect(new TextDecoder().decode(read!.payload)).toBe('[{"id":1}]');
+    // Nothing about the query itself is stored outside the sealed payload.
+    expect(read).not.toHaveProperty('signature');
   });
 
   it('preserves the IV for encrypted entries', async () => {

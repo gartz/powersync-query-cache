@@ -1,6 +1,6 @@
 import { LogLevels, PowerSyncLogger } from '@powersync/common';
 import { QueryCacheInvalidation, QueryCacheOptions, QueryCacheQueryOption, QueryCacheStorage } from './types.js';
-import { decodeRows, encodeRows, QueryCacheEncodeError } from './codec.js';
+import { decodeEnvelope, encodeEnvelope, QueryCacheEncodeError } from './codec.js';
 import { createAesGcmCrypto, createPlaintextCrypto, deriveCacheKey, QueryCacheCrypto } from './crypto.js';
 import { persistedKeyFor } from './keys.js';
 import { MemoryQueryCache } from './MemoryQueryCache.js';
@@ -63,7 +63,7 @@ export class QueryCacheManager {
   /** Persist chains started but not yet settled — awaited by flush(). */
   private readonly inFlight = new Set<Promise<void>>();
 
-  private namespace: Promise<string>;
+  private readonly namespace: Promise<string>;
   private storagePromise?: Promise<QueryCacheStorage | undefined>;
   private crypto?: QueryCacheCrypto;
   private disposeInvalidation?: () => void;
@@ -90,16 +90,6 @@ export class QueryCacheManager {
    */
   resolveForQuery(perQuery: QueryCacheQueryOption | undefined): { enabled: boolean; ttlMs: number } {
     return resolveCacheForQuery(this.config, perQuery);
-  }
-
-  /** Replaces the identity bucket, e.g. after `updateSchema()`. */
-  setNamespace(namespace: Promise<string>): void {
-    this.namespace = namespace;
-    this.memory.clear();
-    // The AES key's HKDF salt is the namespace. Keeping the old derived key would seal
-    // new entries under the NEW namespace with the OLD key — every later decrypt would
-    // fail and self-disable the persistent layer.
-    this.crypto = undefined;
   }
 
   /** Synchronous memory lookup. Safe to call before the database is ready. */
@@ -138,12 +128,6 @@ export class QueryCacheManager {
         return undefined;
       }
 
-      if (entry.signature !== signature) {
-        // Key-hash collision, or an entry written by an older signature format.
-        void this.safely(() => storage.deleteKeys([key]));
-        return undefined;
-      }
-
       const now = this.clock();
       if (isExpired(entry.updatedAt, ttlMs, now)) {
         void this.safely(() => storage.deleteKeys([key]));
@@ -151,7 +135,14 @@ export class QueryCacheManager {
       }
 
       const plain = await (await this.resolveCrypto()).open(entry.payload, entry.iv);
-      const rows = decodeRows(plain);
+      const envelope = decodeEnvelope(plain);
+      if (!envelope || envelope.signature !== signature) {
+        // Key-hash collision, or a record written by an older payload format. Either
+        // way this entry is not this query's, so it is deleted rather than served.
+        void this.safely(() => storage.deleteKeys([key]));
+        return undefined;
+      }
+      const rows = envelope.rows;
 
       this.memory.set(signature, {
         rows,
@@ -169,11 +160,7 @@ export class QueryCacheManager {
   }
 
   /** Records a live emission in memory and schedules the persisted write. */
-  record(
-    signature: string,
-    rows: readonly unknown[],
-    context: { hasSynced: boolean | undefined; ttlMs: number }
-  ): void {
+  record(signature: string, rows: readonly unknown[], context: { hasSynced: boolean | undefined }): void {
     if (!this.enabled) {
       return;
     }
@@ -217,14 +204,28 @@ export class QueryCacheManager {
   async clear(): Promise<void> {
     this.memory.clear();
     this.scheduler.cancelAll();
-    const storage = await this.storage();
-    if (!storage) {
-      return;
+
+    const wipe = (async () => {
+      const storage = await this.storage();
+      if (!storage) {
+        return;
+      }
+      await this.safely(async () => {
+        await storage.clear();
+        storage.notifyInvalidated?.({ type: 'all' });
+      });
+    })();
+
+    // Tracked like a persist: `disconnectAndClear()` fires the `cleared` listener
+    // without awaiting it, so without this a following flush()/close() — and the
+    // database close behind it — could resolve while the physical delete is still
+    // running, leaving the wiped rows on disk.
+    this.inFlight.add(wipe);
+    try {
+      await wipe;
+    } finally {
+      this.inFlight.delete(wipe);
     }
-    await this.safely(async () => {
-      await storage.clear();
-      storage.notifyInvalidated?.({ type: 'all' });
-    });
   }
 
   /** Deletes entries belonging to any other identity bucket. */
@@ -264,7 +265,7 @@ export class QueryCacheManager {
 
     let payload: Uint8Array;
     try {
-      payload = encodeRows(rows);
+      payload = encodeEnvelope(signature, rows);
     } catch (error) {
       // Not a storage failure: this one query's results cannot be represented.
       this.unencodable.add(signature);
@@ -288,7 +289,6 @@ export class QueryCacheManager {
       await storage.write({
         key,
         namespace,
-        signature,
         updatedAt,
         lastUsedAt: updatedAt,
         bytes: payload.byteLength,

@@ -27,7 +27,6 @@ const ctx = (overrides?: Partial<{ dataIsArray: boolean; extensionOptions: unkno
   compiled: { sql: 'SELECT * FROM items', parameters: [] },
   dataIsArray: true,
   extensionOptions: undefined,
-  extensions: undefined,
   db: {} as any,
   ...overrides
 });
@@ -49,7 +48,7 @@ describe('QueryCachePlugin', () => {
     const hooks = first.plugin.onWatchedQueryCreate(ctx())!;
 
     hooks.onResult!([{ id: 1 }], { hasSynced: true, dataIsArray: true });
-    await first.plugin.flushForTests();
+    await first.plugin.flush();
     expect(storage.writes.length).toBe(1);
 
     // A second plugin instance (fresh memory, same storage) hydrates it.
@@ -82,7 +81,7 @@ describe('QueryCachePlugin', () => {
     const { plugin, listeners } = openPlugin(storage);
     const hooks = plugin.onWatchedQueryCreate(ctx())!;
     hooks.onResult!([{ id: 1 }], { hasSynced: true, dataIsArray: true });
-    await plugin.flushForTests();
+    await plugin.flush();
 
     for (const listener of listeners) {
       listener.cleared?.();

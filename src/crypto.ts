@@ -11,12 +11,17 @@ import { toHex } from './keys.js';
  *
  * HKDF does not stretch. It is the right choice for high-entropy keys; an app whose
  * key is derived from a user passphrase should supply a stretched key through
- * `cache.encryption.getKey`.
+ * `cache.encryption.getKey`. That applies to the namespace key fingerprint too: it is
+ * salted and domain-separated, but it is still a single HKDF pass, so a low-entropy
+ * passphrase remains guessable from the stored namespace by anyone holding the disk.
  *
  * @internal
  */
 
 const HKDF_INFO = 'powersync-query-cache/v1';
+const FINGERPRINT_SALT = 'powersync-query-cache/fingerprint';
+const FINGERPRINT_INFO = 'powersync-query-cache/fingerprint/v1';
+const FINGERPRINT_BITS = 128;
 const IV_LENGTH_BYTES = 12;
 
 export interface SealedPayload {
@@ -41,13 +46,34 @@ export function createPlaintextCrypto(): QueryCacheCrypto {
 }
 
 /**
- * SHA-256 of the encryption key, truncated to 128 bits. Used as an identity input so
- * rotating the key changes the namespace and prunes entries written under the old one.
- * The key itself is never stored.
+ * A 128-bit identity tag for the encryption key. Used as a namespace input so rotating
+ * the key changes the namespace and prunes entries written under the old one. The key
+ * itself is never stored.
+ *
+ * Derived with HKDF-SHA256 under a fixed salt and its own `info`, not with a bare
+ * SHA-256 of the key: the namespace is written to disk in cleartext, and an unsalted
+ * single-round digest of a passphrase is a precomputed-dictionary lookup. The salt is
+ * constant so the fingerprint stays deterministic per key — nothing has to be stored
+ * alongside it — and the distinct `info` keeps this output unrelated to the AES key
+ * derived from the same material.
  */
 export async function fingerprintKey(subtle: SubtleCrypto, encryptionKey: string): Promise<string> {
-  const digest = await subtle.digest('SHA-256', new TextEncoder().encode(encryptionKey));
-  return toHex(new Uint8Array(digest).subarray(0, 16));
+  const material = await subtle.importKey('raw', new TextEncoder().encode(encryptionKey), 'HKDF', false, [
+    'deriveBits'
+  ]);
+
+  const bits = await subtle.deriveBits(
+    {
+      name: 'HKDF',
+      hash: 'SHA-256',
+      salt: new TextEncoder().encode(FINGERPRINT_SALT),
+      info: new TextEncoder().encode(FINGERPRINT_INFO)
+    },
+    material,
+    FINGERPRINT_BITS
+  );
+
+  return toHex(new Uint8Array(bits));
 }
 
 /**
@@ -89,7 +115,11 @@ export function createAesGcmCrypto(
 
   return {
     async seal(plain) {
-      const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH_BYTES));
+      // Random bytes deliberately come from the platform Crypto object rather than the
+      // injected `subtle`: SubtleCrypto has no RNG at all — getRandomValues lives on
+      // Crypto, which is its parent — so there is nothing on `subtle` to be consistent
+      // with. Tests inject `subtle` to observe key derivation, never to fake entropy.
+      const iv = globalThis.crypto.getRandomValues(new Uint8Array(IV_LENGTH_BYTES));
       const sealed = await subtle.encrypt({ name: 'AES-GCM', iv }, await resolveKey(), plain as BufferSource);
       return { payload: new Uint8Array(sealed), iv };
     },
