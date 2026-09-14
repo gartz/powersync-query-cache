@@ -162,6 +162,40 @@ They are:
 
 The memory layer is per–database instance and never encrypted. The persistent layer (IndexedDB) survives page reloads and browser restarts.
 
+## Performance
+
+The whole point of the cache is time-to-first-render on a cold boot: a fresh page load
+has to open the SQLite database (backed by IndexedDB in the browser), initialize the
+PowerSync session, and run the first query before anything can render — and that cost
+grows with database size. The cached paint only has to read one small IndexedDB entry,
+so it stays flat no matter how large the database gets.
+
+Measured with the bundled benchmark (`npm run bench:browser`, headless Chromium,
+median of 3 cold boots per mode; a dashboard-shaped watched query — `ORDER BY` over a
+non-indexed column with `LIMIT 50` — against ~1 KB rows):
+
+| Database size | First rows without cache | First rows with cache | Speedup |
+| --- | --- | --- | --- |
+| 10 MB (8k rows) | 1,881 ms | 107 ms | ~18× |
+| 50 MB (38k rows) | 6,600 ms | 89 ms | ~75× |
+| 100 MB (74k rows) | 11,952 ms | 108 ms | ~111× |
+| 200 MB (148k rows) | 20,606 ms | 63 ms | ~328× |
+
+Two things to read out of the table:
+
+- **Without the cache, first render scales with database size** — roughly 100 ms per MB
+  in this setup, because the first query pays for opening and reading the database.
+- **With the cache, first paint is constant** (~60–110 ms here) regardless of size: it
+  never touches SQLite. The live result still arrives on its usual schedule and swaps
+  in (`source` flips from `'cache'` to `'live'`), so at 200 MB the user sees data ~20
+  seconds sooner.
+
+Numbers were taken inside the test runner, where a "cold boot" is a fresh
+`PowerSyncDatabase` instance re-reading pages from IndexedDB (wa-sqlite's page cache is
+per-connection). Absolute times will differ per machine, browser, and query — re-run
+`npm run bench:browser` to measure your own; results land in
+`tests/benchmark/latest-results.json`.
+
 ## Requirements
 
 - **@powersync/common:** >= 2.3.0 (the version shipping the watched-query plugin API). Until published upstream, install the PowerSync SDK from the fork at `github.com/gartz/powersync-js` branch `persistent-query-cache`.

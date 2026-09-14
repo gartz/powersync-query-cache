@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['tests/**/*.test.ts'],
-    exclude: ['tests/idb/**', 'tests/e2e/**']
+    // Browser-only suites: IndexedDB storage, SDK e2e, and the cold-boot benchmark.
+    exclude: ['tests/idb/**', 'tests/e2e/**', 'tests/benchmark/**', '**/node_modules/**']
   }
 });

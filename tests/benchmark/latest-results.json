@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-09-14T07:08:40.514Z",
+  "results": [
+    {
+      "sizeMb": 10,
+      "actualBytes": 11431936,
+      "rows": 8000,
+      "liveNoCacheMs": 1880.659999847412,
+      "cachePaintMs": 107.0250015258789,
+      "liveWithCacheMs": 1860.6199989318848
+    },
+    {
+      "sizeMb": 50,
+      "actualBytes": 53989376,
+      "rows": 38000,
+      "liveNoCacheMs": 6600.204999923706,
+      "cachePaintMs": 88.56000137329102,
+      "liveWithCacheMs": 7285.470001220703
+    },
+    {
+      "sizeMb": 100,
+      "actualBytes": 105095168,
+      "rows": 74000,
+      "liveNoCacheMs": 11952.069999694824,
+      "cachePaintMs": 107.77499961853027,
+      "liveWithCacheMs": 11125.640001296997
+    },
+    {
+      "sizeMb": 200,
+      "actualBytes": 210010112,
+      "rows": 148000,
+      "liveNoCacheMs": 20605.684999465942,
+      "cachePaintMs": 62.89999961853027,
+      "liveWithCacheMs": 22387.159999847412
+    }
+  ]
+}

@@ -7,16 +7,26 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "exports": {
-    ".": { "types": "./lib/index.d.ts", "default": "./lib/index.js" },
-    "./idb": { "types": "./lib/idb/index.d.ts", "default": "./lib/idb/index.js" }
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./idb": {
+      "types": "./lib/idb/index.d.ts",
+      "default": "./lib/idb/index.js"
+    }
   },
-  "files": ["lib", "src"],
+  "files": [
+    "lib",
+    "src"
+  ],
   "scripts": {
     "build": "tsc -b",
     "clean": "rm -rf lib tsconfig.tsbuildinfo",
     "test": "vitest --run",
     "test:node": "vitest --run --config vitest.config.ts",
-    "test:browser": "vitest --run --config vitest.browser.config.ts"
+    "test:browser": "vitest --run --config vitest.browser.config.ts",
+    "bench:browser": "vitest --run --config vitest.bench.config.ts"
   },
   "peerDependencies": {
     "@powersync/common": ">=2.3.0"
