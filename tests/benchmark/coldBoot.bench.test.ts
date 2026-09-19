@@ -1,5 +1,5 @@
 import { commands } from '@vitest/browser/context';
-import { column, PowerSyncDatabase, Schema, Table } from '@powersync/web';
+import { column, PowerSyncDatabase, Schema, Table, WASQLiteVFS } from '@powersync/web';
 import { describe, expect, it } from 'vitest';
 import { QueryCachePlugin } from '../../src/index.js';
 import { IndexedDbQueryCacheStorage } from '../../src/idb/index.js';
@@ -56,6 +56,37 @@ interface SizeResult {
 
 const results: SizeResult[] = [];
 
+/** Ships the measurements to the server side; the reporter does not forward console output. */
+async function saveResults() {
+  await (commands as any).saveBenchResults(
+    JSON.stringify(
+      { generatedAt: new Date().toISOString(), vfs: BENCH_VFS, additionalReaders: BENCH_READERS, cpuThrottle: BENCH_CPU_THROTTLE, results },
+      null,
+      2
+    )
+  );
+}
+
+/**
+ * Which virtual file system the run measures. `IDBBatchAtomicVFS` is the
+ * `@powersync/web` default; `OPFSWriteAheadVFS` is the write-ahead OPFS file system and
+ * the only one supporting additional read connections (`VITE_BENCH_READERS`), so the
+ * same matrix can be measured against the configuration the SDK recommends for
+ * throughput.
+ */
+const BENCH_VFS = ((import.meta as any).env?.VITE_BENCH_VFS as WASQLiteVFS) ?? WASQLiteVFS.IDBBatchAtomicVFS;
+const BENCH_READERS = Number((import.meta as any).env?.VITE_BENCH_READERS ?? 1);
+/**
+ * CPU throttling applied to the measured phase only (not to seeding, which would just
+ * make the suite slower without changing what it measures). 1 = host speed.
+ */
+const BENCH_CPU_THROTTLE = Number((import.meta as any).env?.VITE_BENCH_CPU_THROTTLE ?? 1);
+
+async function setThrottle(rate: number) {
+  if (BENCH_CPU_THROTTLE === 1) return;
+  await (commands as any).setCpuThrottling(rate);
+}
+
 function openDatabase(withCache: boolean): { db: PowerSyncDatabase; plugin?: QueryCachePlugin } {
   const plugin = withCache
     ? new QueryCachePlugin({
@@ -65,7 +96,7 @@ function openDatabase(withCache: boolean): { db: PowerSyncDatabase; plugin?: Que
     : undefined;
   const db = new PowerSyncDatabase({
     schema: testSchema,
-    database: { dbFilename },
+    database: { dbFilename, vfs: BENCH_VFS, additionalReaders: BENCH_READERS },
     ...(plugin ? { plugins: [plugin] } : {})
   });
   return { db, plugin };
@@ -179,7 +210,7 @@ function median(values: number[]): number {
 
 describe('cold boot benchmark', () => {
   for (const sizeMb of SIZES_MB) {
-    it(`measures cold boot at ${sizeMb}MB`, { timeout: 600_000 }, async () => {
+    it(`measures cold boot at ${sizeMb}MB`, { timeout: 1_800_000 }, async () => {
         // Grow the shared database file to this stage's size.
         const { db: seeder } = openDatabase(false);
         await seeder.init();
@@ -204,6 +235,10 @@ describe('cold boot benchmark', () => {
         await warmWatch.close();
         await warmDb.close();
 
+        // Everything up to here (seeding, cache warm-up) runs at host speed; only the
+        // measured boots and navigations are throttled.
+        await setThrottle(BENCH_CPU_THROTTLE);
+
         const noCache: BootTimings[] = [];
         const withCache: BootTimings[] = [];
         for (let i = 0; i < ITERATIONS; i++) {
@@ -213,6 +248,8 @@ describe('cold boot benchmark', () => {
 
         const navNoCacheMs = await measureNav(false);
         const navCacheMs = await measureNav(true);
+
+        await setThrottle(1);
 
         const cachePaints = withCache.map((t) => t.tCache);
         expect(cachePaints.every((t): t is number => typeof t === 'number')).toBe(true);
@@ -228,9 +265,12 @@ describe('cold boot benchmark', () => {
           navCacheMs
         };
         results.push(result);
+        // Persist after every size: a matrix that dies at 200MB must still leave the
+        // sizes it did measure on disk.
+        await saveResults();
         console.log(`BENCH_RESULT ${JSON.stringify(result)}`);
         console.log(
-          `BENCH ${sizeMb}MB (actual ${(actualBytes / 1024 / 1024).toFixed(1)}MB, ${rows} rows): ` +
+          `BENCH [${BENCH_VFS}/${BENCH_READERS}r/${BENCH_CPU_THROTTLE}x] ${sizeMb}MB (actual ${(actualBytes / 1024 / 1024).toFixed(1)}MB, ${rows} rows): ` +
             `no-cache first rows ${result.liveNoCacheMs.toFixed(0)}ms | ` +
             `cache paint ${result.cachePaintMs.toFixed(0)}ms | ` +
             `live swap (cached boot) ${result.liveWithCacheMs.toFixed(0)}ms | ` +
@@ -252,6 +292,6 @@ describe('cold boot benchmark', () => {
     expect(results).toHaveLength(SIZES_MB.length);
     // The reporter does not forward browser console output, so persist the numbers
     // where the host can read them: tests/benchmark/latest-results.json.
-    await (commands as any).saveBenchResults(JSON.stringify({ generatedAt: new Date().toISOString(), results }, null, 2));
+    await saveResults();
   });
 });

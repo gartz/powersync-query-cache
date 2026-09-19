@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-09-19T17:07:13.200Z",
+  "result": {
+    "vfs": "IDBBatchAtomicVFS",
+    "additionalReaders": 1,
+    "cpuThrottle": 1,
+    "sizeMb": 50,
+    "actualBytes": 53981184,
+    "rows": 38000,
+    "adapterColdOpenMs": 408.91500091552734,
+    "adapterColdConstructMs": 1.2350006103515625,
+    "adapterColdResources": [],
+    "adapterWarmOpenMs": 313.10500144958496,
+    "powerSyncInitMs": 621.295000076294,
+    "powerSyncInitOverheadMs": 308.189998626709,
+    "firstQueryMs": 6244.9050006866455,
+    "cacheReadMs": 2.739999771118164
+  }
+}

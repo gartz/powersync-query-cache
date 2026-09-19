@@ -177,16 +177,29 @@ The whole point of the cache is time-to-first-render. Two moments matter:
 
 Measured with the bundled benchmark (`npm run bench:browser`, headless Chromium,
 median of 3 runs per mode; a dashboard-shaped watched query — `ORDER BY` over a
-non-indexed column with `LIMIT 50` — against ~1 KB rows):
+non-indexed column with `LIMIT 50` — against ~1 KB rows). The tables below use the
+`@powersync/web` default file system, `IDBBatchAtomicVFS`; set `VITE_BENCH_VFS` and
+`VITE_BENCH_READERS` to measure another, and `VITE_BENCH_CPU_THROTTLE` to emulate a
+slower device:
 
-**Cold boot — time to first rows:**
+**Cold boot — time to first rows** (`IDBBatchAtomicVFS`, the `@powersync/web` default):
 
 | Database size | Without cache | With cache | Speedup |
 | --- | --- | --- | --- |
-| 10 MB (8k rows) | 1,261 ms | 84 ms | ~15× |
-| 50 MB (38k rows) | 6,650 ms | 86 ms | ~77× |
-| 100 MB (74k rows) | 13,020 ms | 68 ms | ~190× |
-| 200 MB (148k rows) | 22,739 ms | 66 ms | ~346× |
+| 10 MB (8k rows) | 2,223 ms | 6.0 ms | ~370× |
+| 50 MB (38k rows) | 9,688 ms | 7.0 ms | ~1,380× |
+| 100 MB (74k rows) | 12,227 ms | 4.0 ms | ~3,050× |
+| 200 MB (148k rows) | 28,671 ms | 3.2 ms | ~8,960× |
+
+The same query on `OPFSWriteAheadVFS` with three readers, where cold boot is slower but the
+cached paint is not:
+
+| Database size | Without cache | With cache |
+| --- | --- | --- |
+| 10 MB | 6,320 ms | 18.1 ms |
+| 50 MB | 9,552 ms | 24.6 ms |
+| 100 MB | 22,446 ms | 53.2 ms |
+| 200 MB | 29,318 ms | 16.2 ms |
 
 **In-session navigation (query re-mounted, database already open) — time to first rows:**
 
@@ -203,8 +216,15 @@ Three things to read out of the tables:
   every navigation whose query has to scan (the 10 MB nav row is small only because
   that table still fits the warm page cache; past it, re-mounting costs as much as
   booting).
-- **The cold-boot cached paint is constant** (~65–90 ms here) regardless of size: it
-  never touches SQLite.
+- **The cold-boot cached paint does not scale with database size, and barely varies by
+  file system** — 3–7 ms on IndexedDB and 16–53 ms on OPFS, against cold boots of 2–29 s.
+  It never touches SQLite, so it has no reason to.
+
+  Versions before the pre-ready seeding fix measured 66–105 ms here and 4.4–11.3 s on
+  OPFS. That was not a property of either file system: plugin hooks were linked after
+  `db.waitForReady()`, so every seeded paint inherited the whole database startup —
+  exactly the cost seeding exists to skip. Hooks now link before the database is ready.
+  Pre-fix results are kept under `tests/benchmark/before-fix/`.
 - **The navigation cached paint is synchronous** — sub-millisecond and flat, because
   the memory layer fills the watched query's initial state before the first render.
   Pressing back/forward repaints the previous screen instantly; the live result still

@@ -1,0 +1,90 @@
+{
+  "generatedAt": "2026-09-19T08:01:10.188Z",
+  "result": {
+    "vfs": "OPFSWriteAheadVFS",
+    "additionalReaders": 1,
+    "cpuThrottle": 1,
+    "sizeMb": 50,
+    "actualBytes": 54001664,
+    "rows": 38000,
+    "adapterColdOpenMs": 7399.369998931885,
+    "adapterColdConstructMs": 1.0349998474121094,
+    "adapterColdResources": [
+      {
+        "name": "worker.js?worker_file&type=ignore",
+        "startMs": 66.56500053405762,
+        "durationMs": -41.53000068664551,
+        "transferBytes": 300,
+        "decodedBytes": 6774
+      },
+      {
+        "name": "MultiDatabaseServer.js",
+        "startMs": 178.54999923706055,
+        "durationMs": 26.595001220703125,
+        "transferBytes": 300,
+        "decodedBytes": 18054
+      },
+      {
+        "name": "SharedSyncImplementation.js",
+        "startMs": 178.95000076293945,
+        "durationMs": 27.089998245239258,
+        "transferBytes": 300,
+        "decodedBytes": 68674
+      },
+      {
+        "name": "WorkerClient.js",
+        "startMs": 179.33499908447266,
+        "durationMs": 26.260000228881836,
+        "transferBytes": 300,
+        "decodedBytes": 9879
+      },
+      {
+        "name": "DatabaseServer.js",
+        "startMs": 951.125,
+        "durationMs": 43.375,
+        "transferBytes": 300,
+        "decodedBytes": 22154
+      },
+      {
+        "name": "RawSqliteConnection.js",
+        "startMs": 951.5249996185303,
+        "durationMs": 79.38500022888184,
+        "transferBytes": 300,
+        "decodedBytes": 28181
+      },
+      {
+        "name": "ConcurrentConnection.js",
+        "startMs": 951.704999923706,
+        "durationMs": 79.84499931335449,
+        "transferBytes": 300,
+        "decodedBytes": 14193
+      },
+      {
+        "name": "vfs.js",
+        "startMs": 951.8950004577637,
+        "durationMs": 85.51000022888184,
+        "transferBytes": 300,
+        "decodedBytes": 15266
+      },
+      {
+        "name": "BroadcastLogger.js",
+        "startMs": 952.7350006103516,
+        "durationMs": 97.01499938964844,
+        "transferBytes": 300,
+        "decodedBytes": 6809
+      },
+      {
+        "name": "DatabaseClient.js",
+        "startMs": 952.8950004577637,
+        "durationMs": 97.19499969482422,
+        "transferBytes": 300,
+        "decodedBytes": 29963
+      }
+    ],
+    "adapterWarmOpenMs": 4254.5300006866455,
+    "powerSyncInitMs": 4613.260000228882,
+    "powerSyncInitOverheadMs": 358.7299995422363,
+    "firstQueryMs": 7014.89999961853,
+    "cacheReadMs": 5541.784999847412
+  }
+}

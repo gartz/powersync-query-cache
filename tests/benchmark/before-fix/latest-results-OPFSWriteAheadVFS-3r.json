@@ -1,0 +1,37 @@
+{
+  "generatedAt": "2026-09-19T06:59:53.497Z",
+  "vfs": "OPFSWriteAheadVFS",
+  "additionalReaders": 3,
+  "results": [
+    {
+      "sizeMb": 10,
+      "actualBytes": 11460608,
+      "rows": 8000,
+      "liveNoCacheMs": 9457.095001220703,
+      "cachePaintMs": 7801.199998855591,
+      "liveWithCacheMs": 9841.44999885559,
+      "navNoCacheMs": 63.44999885559082,
+      "navCacheMs": 0.29000091552734375
+    },
+    {
+      "sizeMb": 50,
+      "actualBytes": 54005760,
+      "rows": 38000,
+      "liveNoCacheMs": 13463.819999694824,
+      "cachePaintMs": 6577.184999465942,
+      "liveWithCacheMs": 13808.364999771118,
+      "navNoCacheMs": 8365.504999160767,
+      "navCacheMs": 0.22500038146972656
+    },
+    {
+      "sizeMb": 100,
+      "actualBytes": 105111552,
+      "rows": 74000,
+      "liveNoCacheMs": 23392.97500038147,
+      "cachePaintMs": 10898.77499961853,
+      "liveWithCacheMs": 22298.809999465942,
+      "navNoCacheMs": 11421.005001068115,
+      "navCacheMs": 0.12999916076660156
+    }
+  ]
+}

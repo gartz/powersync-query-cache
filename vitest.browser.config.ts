@@ -37,6 +37,18 @@ export default defineConfig({
     globals: true,
     include: ['tests/idb/**/*.test.ts', 'tests/e2e/**/*.test.ts'],
     testTimeout: 30000,
-    browser: { enabled: true, provider: playwright(), headless: true, instances: [{ browser: 'chromium' }] }
+    browser: {
+      enabled: true,
+      // The nest has no system Chromium and Playwright's downloaded build cannot resolve
+      // its shared libraries here, so the browser comes from the environment when
+      // CHROMIUM_EXECUTABLE_PATH is set (see README "Development").
+      provider: playwright({
+        launchOptions: process.env.CHROMIUM_EXECUTABLE_PATH
+          ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH }
+          : {}
+      }),
+      headless: true,
+      instances: [{ browser: 'chromium' }]
+    }
   }
 });

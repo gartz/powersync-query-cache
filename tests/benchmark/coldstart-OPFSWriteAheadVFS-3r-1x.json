@@ -1,0 +1,104 @@
+{
+  "generatedAt": "2026-09-19T17:26:45.855Z",
+  "result": {
+    "vfs": "OPFSWriteAheadVFS",
+    "additionalReaders": 3,
+    "cpuThrottle": 1,
+    "sizeMb": 50,
+    "actualBytes": 54030336,
+    "rows": 38000,
+    "adapterColdOpenMs": 1814.6149997711182,
+    "adapterColdConstructMs": 0.8799991607666016,
+    "adapterColdResources": [
+      {
+        "name": "worker.js?worker_file&type=ignore",
+        "startMs": 14.119998931884766,
+        "durationMs": -9.260000228881836,
+        "transferBytes": 300,
+        "decodedBytes": 6774
+      },
+      {
+        "name": "MultiDatabaseServer.js",
+        "startMs": 16.91499900817871,
+        "durationMs": 8.65999984741211,
+        "transferBytes": 300,
+        "decodedBytes": 18054
+      },
+      {
+        "name": "SharedSyncImplementation.js",
+        "startMs": 17.14499855041504,
+        "durationMs": 8.885000228881836,
+        "transferBytes": 300,
+        "decodedBytes": 68674
+      },
+      {
+        "name": "WorkerClient.js",
+        "startMs": 17.364999771118164,
+        "durationMs": 8.469999313354492,
+        "transferBytes": 300,
+        "decodedBytes": 9879
+      },
+      {
+        "name": "DatabaseServer.js",
+        "startMs": 33.1299991607666,
+        "durationMs": 10.204999923706055,
+        "transferBytes": 300,
+        "decodedBytes": 22154
+      },
+      {
+        "name": "RawSqliteConnection.js",
+        "startMs": 33.529998779296875,
+        "durationMs": 21.700000762939453,
+        "transferBytes": 300,
+        "decodedBytes": 28181
+      },
+      {
+        "name": "ConcurrentConnection.js",
+        "startMs": 33.71999931335449,
+        "durationMs": 21.790000915527344,
+        "transferBytes": 300,
+        "decodedBytes": 14193
+      },
+      {
+        "name": "vfs.js",
+        "startMs": 33.89499855041504,
+        "durationMs": 22.310001373291016,
+        "transferBytes": 300,
+        "decodedBytes": 15266
+      },
+      {
+        "name": "BroadcastLogger.js",
+        "startMs": 35.69999885559082,
+        "durationMs": 28.21500015258789,
+        "transferBytes": 300,
+        "decodedBytes": 6809
+      },
+      {
+        "name": "DatabaseClient.js",
+        "startMs": 35.8799991607666,
+        "durationMs": 28.42500114440918,
+        "transferBytes": 300,
+        "decodedBytes": 29963
+      },
+      {
+        "name": "sqlite-api.js?v=10bd0fef",
+        "startMs": 59.34000015258789,
+        "durationMs": 132.97999954223633,
+        "transferBytes": 300,
+        "decodedBytes": 160540
+      },
+      {
+        "name": "StatementCache.js",
+        "startMs": 60.77499961853027,
+        "durationMs": 120.375,
+        "transferBytes": 300,
+        "decodedBytes": 5055
+      }
+    ],
+    "adapterWarmOpenMs": 1413.4400005340576,
+    "powerSyncInitMs": 1470.5750007629395,
+    "powerSyncInitOverheadMs": 57.135000228881836,
+    "firstQueryMs": 6238.709999084473,
+    "cacheReadMs": 20.18000030517578
+  }
+}

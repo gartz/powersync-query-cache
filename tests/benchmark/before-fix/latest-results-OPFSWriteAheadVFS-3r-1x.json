@@ -1,0 +1,48 @@
+{
+  "generatedAt": "2026-09-19T08:21:41.962Z",
+  "vfs": "OPFSWriteAheadVFS",
+  "additionalReaders": 3,
+  "cpuThrottle": 1,
+  "results": [
+    {
+      "sizeMb": 10,
+      "actualBytes": 11448320,
+      "rows": 8000,
+      "liveNoCacheMs": 5690.2199993133545,
+      "cachePaintMs": 4422.139999389648,
+      "liveWithCacheMs": 5809.435001373291,
+      "navNoCacheMs": 49.26499938964844,
+      "navCacheMs": 0.26000022888183594
+    },
+    {
+      "sizeMb": 50,
+      "actualBytes": 54001664,
+      "rows": 38000,
+      "liveNoCacheMs": 11147.780000686646,
+      "cachePaintMs": 5249.479999542236,
+      "liveWithCacheMs": 11342.79999923706,
+      "navNoCacheMs": 5930.040000915527,
+      "navCacheMs": 0.12000083923339844
+    },
+    {
+      "sizeMb": 100,
+      "actualBytes": 105123840,
+      "rows": 74000,
+      "liveNoCacheMs": 21105.125,
+      "cachePaintMs": 11341.040000915527,
+      "liveWithCacheMs": 21708.359998703003,
+      "navNoCacheMs": 10689.395000457764,
+      "navCacheMs": 0.09499931335449219
+    },
+    {
+      "sizeMb": 200,
+      "actualBytes": 210108416,
+      "rows": 148000,
+      "liveNoCacheMs": 36144.73999977112,
+      "cachePaintMs": 10432.385000228882,
+      "liveWithCacheMs": 33730.694999694824,
+      "navNoCacheMs": 23049.729999542236,
+      "navCacheMs": 0.11499977111816406
+    }
+  ]
+}
